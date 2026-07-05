@@ -180,6 +180,8 @@ type DocumentApi = {
   meta: {
     angles?: { name: string; headline: string; outline: string[] }[];
     anglesLive?: boolean;
+    anglesStatus?: string;
+    anglesError?: string | null;
     trend?: { niche: string; growthPct: number; competition: string };
   };
   branches: BranchRecordApi[];
@@ -215,6 +217,7 @@ export function WriteWorkspace({ documentId }: { documentId: string }) {
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Build LLM headers for requests
   const llmHeaders = useMemo((): Record<string, string> => {
@@ -228,11 +231,20 @@ export function WriteWorkspace({ documentId }: { documentId: string }) {
 
   const handleGenerateAngles = useCallback(async (focusText?: string) => {
     if (!doc) return;
+    
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    
     setGeneratingAngles(true);
     try {
       const res = await fetch("/api/ai/angles", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...llmHeaders },
+        signal: controller.signal,
         body: JSON.stringify({
           documentId: doc.id,
           topic: doc.title,
@@ -252,18 +264,31 @@ export function WriteWorkspace({ documentId }: { documentId: string }) {
             angles: data.angles,
             anglesLive: data.live,
             anglesStatus: "ready",
+            anglesError: data.error || null,
           },
         };
       });
       setShowAngles(true);
       setCustomFocus("");
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        return;
+      }
       console.error(err);
       alert(err instanceof Error ? err.message : "Failed to generate angles");
     } finally {
       setGeneratingAngles(false);
+      abortControllerRef.current = null;
     }
   }, [doc, activeBrainId, llmHeaders]);
+
+  const handleCancelGenerate = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setGeneratingAngles(false);
+  }, []);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -694,7 +719,13 @@ export function WriteWorkspace({ documentId }: { documentId: string }) {
                 <p className="eyebrow text-proof">
                   Suggested angles {doc?.meta?.anglesLive === false && <span className="text-fog">(offline mock)</span>}
                 </p>
-                <button onClick={() => setShowAngles(false)} className="text-xs text-fog hover:text-chalk">
+                <button
+                  onClick={() => {
+                    handleCancelGenerate();
+                    setShowAngles(false);
+                  }}
+                  className="text-xs text-fog hover:text-chalk"
+                >
                   Dismiss
                 </button>
               </div>
@@ -702,10 +733,23 @@ export function WriteWorkspace({ documentId }: { documentId: string }) {
               {generatingAngles ? (
                 <div className="flex flex-col items-center justify-center py-8">
                   <Wand2 size={20} className="animate-spin text-proof mb-2" />
-                  <p className="text-xs text-fog">Generating tailored structured angles with AI...</p>
+                  <p className="text-xs text-fog mb-3">Generating tailored structured angles with AI...</p>
+                  <button
+                    onClick={handleCancelGenerate}
+                    className="rounded border border-ink-line bg-ink px-3 py-1.5 text-[10px] text-chalk hover:bg-ink-3 font-semibold transition-colors cursor-pointer"
+                  >
+                    Stop Generation
+                  </button>
                 </div>
               ) : (
                 <>
+                  {doc?.meta?.anglesError && (
+                    <div className="mb-3 rounded border border-proof/40 bg-proof/5 p-2.5 text-xs text-proof">
+                      <p className="font-semibold">⚠️ Live API call failed:</p>
+                      <p className="mt-0.5 opacity-90 text-[11px]">{String(doc.meta.anglesError)}</p>
+                      <p className="mt-1 text-[10px] text-fog">Showing offline mock templates as fallback.</p>
+                    </div>
+                  )}
                   <div className="grid gap-2 md:grid-cols-3">
                     {angles && angles.map((a) => (
                       <button

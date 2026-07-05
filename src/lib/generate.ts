@@ -24,7 +24,7 @@ export async function generateAngles(
   brand: BrandVoice,
   llmCtx?: LlmContext,
   customFocus?: string
-): Promise<{ angles: ContentAngle[]; live: boolean }> {
+): Promise<{ angles: ContentAngle[]; live: boolean; error?: string }> {
   try {
     let prompt = `Generate exactly three structural content angles for an article about "${topic}": (1) The Beginner's Guide, (2) The Contrarian Take, (3) The Deep Analytical Breakdown. For each give a working headline and a 4-item outline of H2 sections.`;
     if (customFocus) {
@@ -56,8 +56,15 @@ export async function generateAngles(
     });
     return { angles: data.angles.slice(0, 3), live: true };
   } catch (err) {
-    if (!(err instanceof LlmUnavailableError)) console.error("generateAngles live call failed:", err);
-    return { angles: mockAngles(topic, customFocus), live: false };
+    if (err instanceof LlmUnavailableError) {
+      return { angles: mockAngles(topic, customFocus), live: false };
+    }
+    console.error("generateAngles live call failed:", err);
+    return {
+      angles: mockAngles(topic, customFocus),
+      live: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
   }
 }
 

@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     const brand = await getBrandVoice(brandBrainId || doc.brandBrainId);
     const llmCtx = extractLlmContext(req);
 
-    const { angles, live } = await generateAngles(currentTitle, brand, llmCtx, customFocus);
+    const { angles, live, error } = await generateAngles(currentTitle, brand, llmCtx, customFocus);
 
     const updated = await prisma.document.update({
       where: { id: documentId },
@@ -32,11 +32,12 @@ export async function POST(req: NextRequest) {
           angles,
           anglesLive: live,
           anglesStatus: "ready",
+          anglesError: error || null,
         },
       },
     });
 
-    return NextResponse.json({ document: updated, angles, live }, { status: 200 });
+    return NextResponse.json({ document: updated, angles, live, error }, { status: 200 });
   } catch (err) {
     console.error("AI Angles endpoint error:", err);
     return NextResponse.json({ error: err instanceof Error ? err.message : "Internal Server Error" }, { status: 500 });
