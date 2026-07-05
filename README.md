@@ -4,6 +4,37 @@ An AI-powered writing workspace for professional content teams: ideation, live r
 
 ![Stack](https://img.shields.io/badge/Next.js%2015-App%20Router-black) ![DB](https://img.shields.io/badge/PostgreSQL-Prisma-blue) ![Editor](https://img.shields.io/badge/TipTap-ProseMirror-8b5cf6)
 
+---
+
+## 🚀 Key Upgrades
+
+### 1. ⚙️ Multi-Provider LLM & Timeout Protection
+* **Flexible API Keys**: Configure individual client keys dynamically for **Anthropic, OpenAI, Google Gemini, Groq, and OpenRouter**.
+* **Dynamic Model Catalogs**: Fetches live model offerings directly from OpenRouter and Gemini API registries in real-time.
+* **Hangs & Timeout Shield**: Implements a secure `fetchWithTimeout` wrapper (10-second ceiling) on all outgoing API calls to prevent slow endpoints from freezing the Next.js server thread.
+* **Gemini JSON Schema Compatibility**: Includes a recursive helper that strips `additionalProperties` from strict output definitions, making complex schemas 100% compatible with Gemini without breaking OpenAI constraints.
+
+### 2. 🖼️ Smart Image Engine (Drag-to-Resize + Drop & Paste)
+* **Drag-to-Resize Handles**: Clicking any image in the editor spawns a bottom-right resize handle. Drag it to dynamically scale the image container.
+* **Bubble Menu Alignments**: Inline floating bubble menu offers instant block alignments: **Align Left**, **Align Center**, and **Align Right** with CSS flow overrides.
+* **Desktop Drag & Drop**: Drag image files directly from your computer's finder onto the canvas to insert them instantly as base64-encoded elements.
+* **Clipboard Copy & Paste**: Paste screenshots or copied images directly into the document using standard keystrokes (`Cmd + V` / `Ctrl + V`).
+
+### 3. 💡 Live Angles & Custom Focus Customizer
+* **Persistent Toggle Control**: Added a header toolbar button next to the GEO indicator that acts as `Show Angles` / `Hide Angles` / `Generate Angles` based on the document state.
+* **Tailored Focus Outlines**: A custom input form at the bottom of the card lets you type a specific direction (e.g. *"focus on user-generated content validation"*) to regenerate tailored writing templates.
+* **Stop Generation**: Stop active generations instantly during loading states to prevent server-side blockages.
+* **Detailed API Error Reporting**: Transparently displays warning alerts showing exact API fail reasons (e.g. `Google AI 400: API key not valid`) instead of silently serving mock templates.
+
+### 4. 🏋️‍♂️ Expanded Ideation Gaps (Fitness & Sports)
+* **New Niches**: Added **Fitness** and **Sports** to the Discovery dashboard.
+* **Structured Trends**: Seeded with default trends such as *Hyrox training plans* (high growth, low competition), *Rucking efficiency*, *Thermoformed pickleball paddles*, and *F1 ground effect mechanics*. Fully supports live LLM trend generation.
+
+### 5. 📢 Expanded Multi-Channel Distribution
+* **Blogger & Medium Integration**: Upgraded the **Distribute Asset** drawer to support direct drafting/publishing pipelines to **Medium** and **Google Blogspot (Blogger)**.
+
+---
+
 ## Features
 
 | Feature | Where | What it does |
@@ -28,7 +59,7 @@ src/
 │       ├── branches/[id]/        # Activate / update / delete variants
 │       ├── research/             # search (mock/Tavily), summarize
 │       ├── trends/               # GET trends, POST write (provision doc + angles)
-│       ├── ai/                   # cascade (distribution pack), rephrase
+│       ├── ai/                   # cascade (distribution pack), rephrase, angles (outline generator)
 │       └── geo/score/            # Full analysis endpoint (same engines as the live panel)
 ├── components/
 │   ├── Navbar.tsx                # Workspace + Brand Brain selectors (zustand, persisted)
@@ -41,7 +72,7 @@ src/
 │       └── DistributeDrawer.tsx  # Cascade tabs + copy hooks
 └── lib/
     ├── geo.ts, readability.ts, cadence.ts   # Pure scoring engines (unit-tested)
-    ├── llm.ts                    # Anthropic orchestration (claude-opus-4-8, structured JSON)
+    ├── llm.ts                    # Dynamic Multi-Provider API Keys (stripping Schema parameters, timeouts)
     ├── generate.ts               # Feature generators w/ deterministic offline fallbacks
     ├── research.ts, trends.ts    # Mock corpus (seeded PRNG) + trend dataset
     ├── branching.ts              # Pure branch-tree operations
@@ -50,9 +81,7 @@ src/
 
 **Data model** (PostgreSQL via Prisma): `User → Workspace → BrandBrain / Document → TextBranch`. Documents store the TipTap node tree and free-form metadata as JSONB; `TextBranch` is a self-relating tree (root = original block, children = Version A/B…) anchored to a top-level block index.
 
-**AI orchestration**: every generator calls Claude (`claude-opus-4-8`) with a strict JSON schema via `output_config.format` when `ANTHROPIC_API_KEY` is set, and falls back to deterministic mocks otherwise — so every workflow is fully demoable offline, and the UI labels mock output. The active Brand Brain's guidelines are injected into each system prompt.
-
-**Analysis engines** run client-side on each edit (debounced) — the same pure functions power the `/api/geo/score` endpoint and the test suite. Readability issues are mapped from block-relative character offsets onto ProseMirror positions by a decoration plugin.
+---
 
 ## Running locally
 
@@ -61,7 +90,7 @@ Prereqs: Node 20+, Docker (for PostgreSQL).
 ```bash
 npm install
 npm run setup        # docker compose up + prisma migrate + seed
-npm run dev          # http://localhost:3000
+npm run dev          # http://localhost:3100
 ```
 
 Individual steps: `npm run db:up`, `npm run db:migrate`, `npm run db:seed`, `npm run db:studio`.
@@ -77,19 +106,10 @@ The database runs on host port **5433** (`postgresql://editorial:editorial@local
 
 Seeded demo data: one user, two workspaces (Acme Content Studio, Nimbus Agency), three Brand Brains, and one sample draft.
 
+---
+
 ## Testing
 
 ```bash
 npm test             # vitest — 36 tests across 7 files
 ```
-
-Covers the GEO scoring engine, readability scanner (offsets, replacements), cadence/burstiness analysis, branch-tree grouping and variant application, the deterministic research corpus + SERP aggregation, offline generators, and API route handlers (search validation, scoring, trend filtering).
-
-A Playwright pass also exercised the full user paths end-to-end (31 checks): desk, discovery filters, write-about-this provisioning, editor analysis + inline fix popover, research search/summarize/SERP, clip & quote insertion, branching (create, variant, compare), and the distribute drawer.
-
-## Notes & trade-offs
-
-- **Auth** is out of scope; the app runs as the seeded demo user. All models are keyed for multi-tenant workspaces, so adding auth means scoping queries by session user.
-- The **angle worker** runs inline in the provision request (instant when mocked, a few seconds live). For heavy live traffic, move it to a queue and poll `meta.anglesStatus`.
-- The **plagiarism/AI-cadence scan is simulated** as specified — a burstiness/diversity heuristic, not a similarity search against an index.
-- Trend data is a static dataset behind `getTrends()`; swap in a live provider without touching the dashboard.
