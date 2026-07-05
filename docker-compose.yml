@@ -1,0 +1,21 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: editorial-studio-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: editorial
+      POSTGRES_PASSWORD: editorial
+      POSTGRES_DB: editorial_studio
+    ports:
+      - "5433:5432"
+    volumes:
+      - editorial_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U editorial -d editorial_studio"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  editorial_pgdata:

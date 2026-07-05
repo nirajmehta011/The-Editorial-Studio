@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String      @id @default(cuid())
+  email      String      @unique
+  name       String
+  createdAt  DateTime    @default(now())
+  workspaces Workspace[]
+}
+
+model Workspace {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  owner       User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId     String
+  brandBrains BrandBrain[]
+  documents   Document[]
+  createdAt   DateTime     @default(now())
+}
+
+model BrandBrain {
+  id           String     @id @default(cuid())
+  workspace    Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId  String
+  name         String
+  description  String?
+  /// Uploaded brand guidelines (markdown). Injected into every LLM system prompt.
+  guidelines   String
+  /// e.g. ["direct", "playful", "no jargon"]
+  toneKeywords Json       @default("[]")
+  documents    Document[]
+  createdAt    DateTime   @default(now())
+}
+
+enum DocumentStatus {
+  DRAFT
+  IN_REVIEW
+  READY
+  PUBLISHED
+}
+
+model Document {
+  id           String         @id @default(cuid())
+  workspace    Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId  String
+  brandBrain   BrandBrain?    @relation(fields: [brandBrainId], references: [id], onDelete: SetNull)
+  brandBrainId String?
+  title        String
+  /// TipTap document JSON (node tree)
+  content      Json
+  status       DocumentStatus @default(DRAFT)
+  /// Free-form metadata: source trend, generated angles, target keyword, etc.
+  meta         Json           @default("{}")
+  branches     TextBranch[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model TextBranch {
+  id          String       @id @default(cuid())
+  document    Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  documentId  String
+  /// Root branch of a group holds the original block; children are variants.
+  parent      TextBranch?  @relation("BranchTree", fields: [parentId], references: [id], onDelete: Cascade)
+  parentId    String?
+  children    TextBranch[] @relation("BranchTree")
+  /// "Original", "Version A", "Version B", ...
+  label       String
+  /// Index of the anchored top-level node in the document at branch time.
+  anchorIndex Int
+  /// TipTap JSON for the branched block.
+  content     Json
+  /// Which variant is currently applied in the document.
+  isActive    Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+}

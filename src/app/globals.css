@@ -1,0 +1,314 @@
+@import "tailwindcss";
+
+/*
+  The Editorial Studio — design tokens.
+  Chrome is deep ink; the writing canvas is warm paper. Accent is proof-red
+  (the copyeditor's pencil); readability marks use galley-highlighter yellow.
+*/
+@theme {
+  --color-ink: #14161b;
+  --color-ink-2: #1c1f26;
+  --color-ink-3: #262a33;
+  --color-ink-line: #333845;
+  --color-paper: #faf7f0;
+  --color-paper-dim: #f1ede3;
+  --color-chalk: #e8e6e1;
+  --color-fog: #9aa0ad;
+  --color-proof: #e2492f;
+  --color-proof-soft: #f3d9d3;
+  --color-mark: #f5d547;
+  --color-sage: #7fa876;
+}
+
+/* Font tokens live outside @theme: they reference next/font variables set on
+   <body>, which Tailwind's theme compiler drops. Plain :root vars resolve fine. */
+:root {
+  --font-ui: var(--font-plex-sans), "Helvetica Neue", sans-serif;
+  --font-prose: var(--font-newsreader), Georgia, serif;
+  --font-data: var(--font-plex-mono), "SF Mono", monospace;
+}
+
+body {
+  background: var(--color-ink);
+  color: var(--color-chalk);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-mark) 65%, transparent);
+  color: #14161b;
+}
+
+/* ------------------------------------------------------------------ */
+/* Format toolbar                                                       */
+/* ------------------------------------------------------------------ */
+
+.format-toolbar {
+  border-bottom: 1px solid var(--color-ink-line);
+  background: color-mix(in srgb, var(--color-ink-2) 96%, transparent);
+}
+
+/* ------------------------------------------------------------------ */
+/* Editor canvas (TipTap prose)                                        */
+/* ------------------------------------------------------------------ */
+
+.editor-canvas .tiptap {
+  font-family: var(--font-prose);
+  font-size: 1.14rem;
+  line-height: 1.72;
+  color: #23211c;
+  min-height: 60vh;
+  outline: none;
+  padding: 3.5rem 3.75rem 6rem;
+}
+
+.editor-canvas .tiptap > * + * {
+  margin-top: 0.9em;
+}
+
+.editor-canvas .tiptap h1 {
+  font-size: 2.3rem;
+  line-height: 1.15;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin-top: 0;
+}
+
+.editor-canvas .tiptap h2 {
+  font-size: 1.55rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  margin-top: 1.6em;
+}
+
+.editor-canvas .tiptap h3 {
+  font-size: 1.22rem;
+  font-weight: 600;
+  margin-top: 1.3em;
+}
+
+.editor-canvas .tiptap blockquote {
+  border-left: 3px solid var(--color-proof);
+  padding-left: 1.1rem;
+  font-style: italic;
+  color: #4c4639;
+}
+
+.editor-canvas .tiptap ul { list-style: disc; padding-left: 1.4rem; }
+.editor-canvas .tiptap ol { list-style: decimal; padding-left: 1.4rem; }
+
+.editor-canvas .tiptap a {
+  color: var(--color-proof);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.editor-canvas .tiptap code {
+  font-family: var(--font-data);
+  font-size: 0.85em;
+  background: var(--color-paper-dim);
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+}
+
+.editor-canvas .tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: #b3ab99;
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ */
+/* Task lists                                                           */
+/* ------------------------------------------------------------------ */
+
+.editor-canvas .tiptap ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+}
+
+.editor-canvas .tiptap ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.editor-canvas .tiptap ul[data-type="taskList"] li > label {
+  flex-shrink: 0;
+  margin-top: 0.28em;
+}
+
+.editor-canvas .tiptap ul[data-type="taskList"] li > label input[type="checkbox"] {
+  cursor: pointer;
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--color-proof);
+}
+
+.editor-canvas .tiptap ul[data-type="taskList"] li[data-checked="true"] > div {
+  color: #8c8677;
+  text-decoration: line-through;
+}
+
+/* ------------------------------------------------------------------ */
+/* Tables                                                               */
+/* ------------------------------------------------------------------ */
+
+.editor-canvas .tiptap table {
+  border-collapse: collapse;
+  margin: 1.5em 0;
+  overflow: hidden;
+  width: 100%;
+  border-radius: 6px;
+  border: 1px solid #d4cfc5;
+}
+
+.editor-canvas .tiptap table td,
+.editor-canvas .tiptap table th {
+  border: 1px solid #d4cfc5;
+  box-sizing: border-box;
+  min-width: 1em;
+  padding: 0.6rem 0.8rem;
+  position: relative;
+  vertical-align: top;
+}
+
+.editor-canvas .tiptap table th {
+  background-color: var(--color-paper-dim);
+  font-weight: 600;
+  text-align: left;
+}
+
+.editor-canvas .tiptap table .selectedCell:after {
+  background: color-mix(in srgb, var(--color-proof) 15%, transparent);
+  content: "";
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  position: absolute;
+  z-index: 2;
+}
+
+.editor-canvas .tiptap table .column-resize-handle {
+  background-color: var(--color-proof);
+  bottom: -2px;
+  pointer-events: none;
+  position: absolute;
+  right: -2px;
+  top: 0;
+  width: 4px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Images                                                               */
+/* ------------------------------------------------------------------ */
+
+.editor-canvas .tiptap img {
+  max-width: 100%;
+  border-radius: 6px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+  display: block;
+  margin: 1em auto;
+}
+
+.editor-canvas .tiptap img.ProseMirror-selectednode {
+  outline: 3px solid var(--color-proof);
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Horizontal rule / page break                                         */
+/* ------------------------------------------------------------------ */
+
+.editor-canvas .tiptap hr {
+  border: none;
+  border-top: 2px dashed #c8c2b6;
+  margin: 2.5em 0;
+  position: relative;
+}
+
+.editor-canvas .tiptap hr::after {
+  content: "— — —";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: var(--color-paper);
+  padding: 0 0.75rem;
+  color: #b3ab99;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+}
+
+/* ------------------------------------------------------------------ */
+/* Text alignment                                                       */
+/* ------------------------------------------------------------------ */
+
+.editor-canvas .tiptap [style*="text-align: center"] { text-align: center; }
+.editor-canvas .tiptap [style*="text-align: right"] { text-align: right; }
+.editor-canvas .tiptap [style*="text-align: justify"] { text-align: justify; }
+
+/* ------------------------------------------------------------------ */
+/* Readability issue decorations                                        */
+/* ------------------------------------------------------------------ */
+
+.issue-mark {
+  background: color-mix(in srgb, var(--color-mark) 45%, transparent);
+  border-bottom: 2px solid color-mix(in srgb, var(--color-mark) 90%, #8a7500);
+  cursor: pointer;
+  border-radius: 2px;
+}
+.issue-mark--passive {
+  background: color-mix(in srgb, var(--color-proof) 18%, transparent);
+  border-bottom-color: var(--color-proof);
+}
+
+/* ------------------------------------------------------------------ */
+/* Branched block indicator                                             */
+/* ------------------------------------------------------------------ */
+
+.branched-block {
+  position: relative;
+  border-left: 3px double var(--color-proof);
+  padding-left: 0.9rem;
+  margin-left: -0.9rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Focus mode                                                           */
+/* ------------------------------------------------------------------ */
+
+.focus-mode .editor-canvas {
+  max-width: 68ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ------------------------------------------------------------------ */
+/* Utility crumbs                                                       */
+/* ------------------------------------------------------------------ */
+
+.eyebrow {
+  font-family: var(--font-data);
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.score-stamp {
+  font-family: var(--font-data);
+  border: 2.5px solid currentColor;
+  border-radius: 6px;
+  transform: rotate(-3deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
