@@ -22,12 +22,17 @@ export type ContentAngle = { name: string; headline: string; outline: string[] }
 export async function generateAngles(
   topic: string,
   brand: BrandVoice,
-  llmCtx?: LlmContext
+  llmCtx?: LlmContext,
+  customFocus?: string
 ): Promise<{ angles: ContentAngle[]; live: boolean }> {
   try {
+    let prompt = `Generate exactly three structural content angles for an article about "${topic}": (1) The Beginner's Guide, (2) The Contrarian Take, (3) The Deep Analytical Breakdown. For each give a working headline and a 4-item outline of H2 sections.`;
+    if (customFocus) {
+      prompt += ` Please prioritize and tailor all three angles to focus on: ${customFocus}.`;
+    }
     const data = await completeStructured<{ angles: ContentAngle[] }>({ llmCtx,
       system: brandSystemPrompt(brand),
-      prompt: `Generate exactly three structural content angles for an article about "${topic}": (1) The Beginner's Guide, (2) The Contrarian Take, (3) The Deep Analytical Breakdown. For each give a working headline and a 4-item outline of H2 sections.`,
+      prompt,
       schema: {
         type: "object",
         properties: {
@@ -52,15 +57,16 @@ export async function generateAngles(
     return { angles: data.angles.slice(0, 3), live: true };
   } catch (err) {
     if (!(err instanceof LlmUnavailableError)) console.error("generateAngles live call failed:", err);
-    return { angles: mockAngles(topic), live: false };
+    return { angles: mockAngles(topic, customFocus), live: false };
   }
 }
 
-export function mockAngles(topic: string): ContentAngle[] {
+export function mockAngles(topic: string, customFocus?: string): ContentAngle[] {
+  const suffix = customFocus ? ` (Focus: ${customFocus})` : "";
   return [
     {
       name: "The Beginner's Guide",
-      headline: `${topic}: The No-Jargon Starter Guide`,
+      headline: `${topic}: The No-Jargon Starter Guide${suffix}`,
       outline: [
         `What ${topic} actually is (and isn't)`,
         "The 20% of concepts that cover 80% of cases",
@@ -70,7 +76,7 @@ export function mockAngles(topic: string): ContentAngle[] {
     },
     {
       name: "The Contrarian Take",
-      headline: `Everyone Is Wrong About ${topic}`,
+      headline: `Everyone Is Wrong About ${topic}${suffix}`,
       outline: [
         "The consensus view — and where it breaks",
         "What the data says when you look closer",
@@ -80,7 +86,7 @@ export function mockAngles(topic: string): ContentAngle[] {
     },
     {
       name: "The Deep Analytical Breakdown",
-      headline: `${topic} by the Numbers: A Complete Analysis`,
+      headline: `${topic} by the Numbers: A Complete Analysis${suffix}`,
       outline: [
         "Market size, growth curve, and who's spending",
         "Benchmark data across 6 dimensions",

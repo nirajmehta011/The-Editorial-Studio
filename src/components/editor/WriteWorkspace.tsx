@@ -193,7 +193,7 @@ function readingTime(wordCount: number): string {
 }
 
 export function WriteWorkspace({ documentId }: { documentId: string }) {
-  const { llmProvider, llmApiKey, llmModel } = useStudioStore();
+  const { llmProvider, llmApiKey, llmModel, activeBrainId } = useStudioStore();
 
   const [doc, setDoc] = useState<DocumentApi | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -210,6 +210,8 @@ export function WriteWorkspace({ documentId }: { documentId: string }) {
   const [showAngles, setShowAngles] = useState(true);
   const [focusMode, setFocusMode] = useState(false);
   const [findReplaceOpen, setFindReplaceOpen] = useState(false);
+  const [generatingAngles, setGeneratingAngles] = useState(false);
+  const [customFocus, setCustomFocus] = useState("");
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -223,6 +225,45 @@ export function WriteWorkspace({ documentId }: { documentId: string }) {
       ...(llmModel ? { "x-llm-model": llmModel } : {}),
     };
   }, [llmProvider, llmApiKey, llmModel]);
+
+  const handleGenerateAngles = useCallback(async (focusText?: string) => {
+    if (!doc) return;
+    setGeneratingAngles(true);
+    try {
+      const res = await fetch("/api/ai/angles", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...llmHeaders },
+        body: JSON.stringify({
+          documentId: doc.id,
+          topic: doc.title,
+          brandBrainId: activeBrainId,
+          customFocus: focusText,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to generate angles");
+      
+      setDoc((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          meta: {
+            ...prev.meta,
+            angles: data.angles,
+            anglesLive: data.live,
+            anglesStatus: "ready",
+          },
+        };
+      });
+      setShowAngles(true);
+      setCustomFocus("");
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "Failed to generate angles");
+    } finally {
+      setGeneratingAngles(false);
+    }
+  }, [doc, activeBrainId, llmHeaders]);
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -611,6 +652,22 @@ export function WriteWorkspace({ documentId }: { documentId: string }) {
           </span>
         )}
         <button
+          onClick={() => {
+            if (!angles) {
+              void handleGenerateAngles();
+            } else {
+              setShowAngles((s) => !s);
+            }
+          }}
+          disabled={generatingAngles}
+          className={`flex items-center gap-1.5 rounded border border-ink-line bg-ink-2 px-3 py-1.5 text-xs text-chalk hover:bg-ink-3 transition-colors disabled:opacity-50 ${
+            showAngles && angles ? "border-proof text-proof bg-proof/5" : ""
+          }`}
+        >
+          <Wand2 size={12} className={generatingAngles ? "animate-spin" : ""} />
+          {generatingAngles ? "Generating…" : angles ? (showAngles ? "Hide Angles" : "Show Angles") : "Generate Angles"}
+        </button>
+        <button
           onClick={() => setDrawerOpen(true)}
           className="flex items-center gap-1.5 rounded bg-proof px-3 py-1.5 text-sm font-medium text-paper"
         >
@@ -631,7 +688,7 @@ export function WriteWorkspace({ documentId }: { documentId: string }) {
       <div className="flex min-h-0 flex-1">
         {/* Canvas */}
         <div className="relative min-w-0 flex-1 overflow-y-auto" ref={canvasRef}>
-          {angles && showAngles && (
+          {((angles && showAngles) || generatingAngles) && (
             <div className="mx-auto mt-5 max-w-[720px] rounded-lg border border-ink-line bg-ink-2 p-4">
               <div className="mb-2 flex items-center justify-between">
                 <p className="eyebrow text-proof">
@@ -641,32 +698,65 @@ export function WriteWorkspace({ documentId }: { documentId: string }) {
                   Dismiss
                 </button>
               </div>
-              <div className="grid gap-2 md:grid-cols-3">
-                {angles.map((a) => (
-                  <button
-                    key={a.name}
-                    className="rounded border border-ink-line p-2.5 text-left transition-colors hover:border-proof"
-                    onClick={() => {
-                      if (!editor) return;
-                      editor
-                        .chain()
-                        .focus("end")
-                        .insertContent([
-                          { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: a.headline }] },
-                          ...a.outline.map((o) => ({
-                            type: "heading",
-                            attrs: { level: 3 },
-                            content: [{ type: "text", text: o }],
-                          })),
-                        ])
-                        .run();
+
+              {generatingAngles ? (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <Wand2 size={20} className="animate-spin text-proof mb-2" />
+                  <p className="text-xs text-fog">Generating tailored structured angles with AI...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-2 md:grid-cols-3">
+                    {angles && angles.map((a) => (
+                      <button
+                        key={a.name}
+                        className="rounded border border-ink-line p-2.5 text-left transition-colors hover:border-proof"
+                        onClick={() => {
+                          if (!editor) return;
+                          editor
+                            .chain()
+                            .focus("end")
+                            .insertContent([
+                              { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: a.headline }] },
+                              ...a.outline.map((o) => ({
+                                type: "heading",
+                                attrs: { level: 3 },
+                                content: [{ type: "text", text: o }],
+                              })),
+                            ])
+                            .run();
+                        }}
+                      >
+                        <p className="text-xs font-medium text-mark">{a.name}</p>
+                        <p className="mt-1 text-xs leading-snug text-chalk">{a.headline}</p>
+                      </button>
+                    ))}
+                  </div>
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void handleGenerateAngles(customFocus);
                     }}
+                    className="mt-4 flex items-center gap-2 border-t border-ink-line pt-3"
                   >
-                    <p className="text-xs font-medium text-mark">{a.name}</p>
-                    <p className="mt-1 text-xs leading-snug text-chalk">{a.headline}</p>
-                  </button>
-                ))}
-              </div>
+                    <input
+                      type="text"
+                      value={customFocus}
+                      onChange={(e) => setCustomFocus(e.target.value)}
+                      placeholder="Type custom focus (e.g. 'focus on pricing', 'mobile first')..."
+                      className="flex-1 rounded border border-ink-line bg-ink px-2.5 py-1.5 text-xs text-chalk outline-none placeholder:text-fog/40 focus:border-proof"
+                    />
+                    <button
+                      type="submit"
+                      disabled={generatingAngles}
+                      className="rounded bg-proof px-3 py-1.5 text-xs font-semibold text-paper hover:bg-proof/90 disabled:opacity-50 flex items-center gap-1 cursor-pointer"
+                    >
+                      <Wand2 size={11} /> Generate
+                    </button>
+                  </form>
+                </>
+              )}
             </div>
           )}
 
