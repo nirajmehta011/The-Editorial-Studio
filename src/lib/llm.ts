@@ -126,6 +126,21 @@ async function callOpenAICompat(opts: {
   return data.choices[0]?.message?.content ?? "{}";
 }
 
+function stripAdditionalProperties(schema: any): any {
+  if (schema === null || typeof schema !== "object") {
+    return schema;
+  }
+  if (Array.isArray(schema)) {
+    return schema.map(stripAdditionalProperties);
+  }
+  const copy = { ...schema };
+  delete copy.additionalProperties;
+  for (const key in copy) {
+    copy[key] = stripAdditionalProperties(copy[key]);
+  }
+  return copy;
+}
+
 async function callGoogle(opts: {
   apiKey: string;
   model: string;
@@ -146,7 +161,7 @@ async function callGoogle(opts: {
         generationConfig: {
           maxOutputTokens: opts.maxTokens,
           responseMimeType: "application/json",
-          responseSchema: opts.schema,
+          responseSchema: stripAdditionalProperties(opts.schema),
         },
       }),
     }
