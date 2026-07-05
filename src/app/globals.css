@@ -215,6 +215,18 @@ body {
   margin: 1em auto;
 }
 
+.editor-canvas .tiptap img.image-align-left {
+  margin: 1em auto 1em 0 !important;
+}
+
+.editor-canvas .tiptap img.image-align-center {
+  margin: 1em auto !important;
+}
+
+.editor-canvas .tiptap img.image-align-right {
+  margin: 1em 0 1em auto !important;
+}
+
 .editor-canvas .tiptap img.ProseMirror-selectednode {
   outline: 3px solid var(--color-proof);
   outline-offset: 2px;

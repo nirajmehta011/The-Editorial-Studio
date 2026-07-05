@@ -46,6 +46,41 @@ import { scanBlocks, ReadabilityIssue } from "@/lib/readability";
 import { scanCadence } from "@/lib/cadence";
 import { useStudioStore } from "@/lib/store";
 
+const CustomImage = Image.extend({
+  addAttributes() {
+    return {
+      src: {
+        default: null,
+      },
+      alt: {
+        default: null,
+      },
+      title: {
+        default: null,
+      },
+      width: {
+        default: "100%",
+        parseHTML: (element) => element.style.width || "100%",
+        renderHTML: (attributes) => {
+          return {
+            style: `width: ${attributes.width}; max-width: 100%; height: auto; display: block;`,
+          };
+        },
+      },
+      alignment: {
+        default: "center",
+        parseHTML: (element) => element.getAttribute("data-align") || "center",
+        renderHTML: (attributes) => {
+          return {
+            "data-align": attributes.alignment,
+            class: `image-align-${attributes.alignment}`,
+          };
+        },
+      },
+    };
+  },
+});
+
 type DocumentApi = {
   id: string;
   title: string;
@@ -119,7 +154,7 @@ export function WriteWorkspace({ documentId }: { documentId: string }) {
       TableRow,
       TableHeader,
       TableCell,
-      Image.configure({ inline: false, allowBase64: true }),
+      CustomImage.configure({ inline: false, allowBase64: true }),
     ],
     editorProps: { attributes: { class: "tiptap" } },
     onUpdate: () => {
@@ -508,7 +543,11 @@ export function WriteWorkspace({ documentId }: { documentId: string }) {
 
           <div className="editor-canvas mx-auto my-5 max-w-[720px] rounded-sm bg-paper shadow-[0_2px_24px_rgba(0,0,0,0.45)]">
             {editor && (
-              <BubbleMenu editor={editor} tippyOptions={{ duration: 120 }}>
+              <BubbleMenu
+                editor={editor}
+                tippyOptions={{ duration: 120 }}
+                shouldShow={({ state }) => !state.selection.empty && !editor.isActive("image")}
+              >
                 <div className="flex overflow-hidden rounded-md border border-ink-line bg-ink-2 shadow-xl">
                   <button
                     onClick={() => void createBranch()}
@@ -523,6 +562,63 @@ export function WriteWorkspace({ documentId }: { documentId: string }) {
                   >
                     <Wand2 size={12} className="text-mark" /> {rephrasing ? "Rewriting…" : "Humanize"}
                   </button>
+                </div>
+              </BubbleMenu>
+            )}
+
+            {editor && (
+              <BubbleMenu
+                editor={editor}
+                tippyOptions={{ duration: 120 }}
+                shouldShow={({ editor }) => editor.isActive("image")}
+              >
+                <div className="flex overflow-hidden rounded-md border border-ink-line bg-ink-2 shadow-xl items-center divide-x divide-ink-line">
+                  <div className="flex items-center p-1 gap-1">
+                    <button
+                      onClick={() => editor.chain().focus().updateAttributes("image", { width: "25%" }).run()}
+                      className="px-2 py-1 text-[10px] font-semibold text-chalk hover:bg-ink-3 rounded"
+                    >
+                      25%
+                    </button>
+                    <button
+                      onClick={() => editor.chain().focus().updateAttributes("image", { width: "50%" }).run()}
+                      className="px-2 py-1 text-[10px] font-semibold text-chalk hover:bg-ink-3 rounded"
+                    >
+                      50%
+                    </button>
+                    <button
+                      onClick={() => editor.chain().focus().updateAttributes("image", { width: "75%" }).run()}
+                      className="px-2 py-1 text-[10px] font-semibold text-chalk hover:bg-ink-3 rounded"
+                    >
+                      75%
+                    </button>
+                    <button
+                      onClick={() => editor.chain().focus().updateAttributes("image", { width: "100%" }).run()}
+                      className="px-2 py-1 text-[10px] font-semibold text-chalk hover:bg-ink-3 rounded"
+                    >
+                      100%
+                    </button>
+                  </div>
+                  <div className="flex items-center p-1 gap-1">
+                    <button
+                      onClick={() => editor.chain().focus().updateAttributes("image", { alignment: "left" }).run()}
+                      className="px-2 py-1 text-[10px] text-chalk hover:bg-ink-3 rounded"
+                    >
+                      Left
+                    </button>
+                    <button
+                      onClick={() => editor.chain().focus().updateAttributes("image", { alignment: "center" }).run()}
+                      className="px-2 py-1 text-[10px] text-chalk hover:bg-ink-3 rounded"
+                    >
+                      Center
+                    </button>
+                    <button
+                      onClick={() => editor.chain().focus().updateAttributes("image", { alignment: "right" }).run()}
+                      className="px-2 py-1 text-[10px] text-chalk hover:bg-ink-3 rounded"
+                    >
+                      Right
+                    </button>
+                  </div>
                 </div>
               </BubbleMenu>
             )}
