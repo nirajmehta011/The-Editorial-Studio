@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useEditor, EditorContent, BubbleMenu } from "@tiptap/react";
+import { useEditor, EditorContent, BubbleMenu, ReactNodeViewRenderer, NodeViewWrapper } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Link_ from "@tiptap/extension-link";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -46,6 +46,93 @@ import { scanBlocks, ReadabilityIssue } from "@/lib/readability";
 import { scanCadence } from "@/lib/cadence";
 import { useStudioStore } from "@/lib/store";
 
+function ResizableImageNodeView(props: any) {
+  const { node, updateAttributes, selected } = props;
+  const { src, alt, width, alignment } = node.attrs;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const [resizing, setResizing] = useState(false);
+
+  const startResize = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    setResizing(true);
+
+    const startX = e.clientX;
+    const startWidth = imageRef.current ? imageRef.current.offsetWidth : 300;
+
+    const onPointerMove = (moveEvent: PointerEvent) => {
+      const currentX = moveEvent.clientX;
+      const diffX = currentX - startX;
+      // Calculate new width relative to start width
+      const newWidth = Math.max(100, startWidth + diffX);
+      updateAttributes({ width: `${newWidth}px` });
+    };
+
+    const onPointerUp = () => {
+      setResizing(false);
+      document.removeEventListener("pointermove", onPointerMove);
+      document.removeEventListener("pointerup", onPointerUp);
+    };
+
+    document.addEventListener("pointermove", onPointerMove);
+    document.addEventListener("pointerup", onPointerUp);
+  }, [updateAttributes]);
+
+  return (
+    <NodeViewWrapper
+      style={{
+        display: "flex",
+        justifyContent: alignment === "left" ? "flex-start" : alignment === "right" ? "flex-end" : "center",
+        margin: "1.5em 0",
+        width: "100%",
+      }}
+    >
+      <div
+        ref={containerRef}
+        className={`relative inline-block group ${selected ? "ring-2 ring-proof ring-offset-2 rounded-lg" : ""}`}
+        style={{ width: width || "100%", maxWidth: "100%", position: "relative" }}
+      >
+        <img
+          ref={imageRef}
+          src={src}
+          alt={alt}
+          className="w-full h-auto rounded-lg select-none pointer-events-none"
+          style={{ display: "block", width: "100%" }}
+        />
+        
+        {/* Resize handle in bottom-right corner */}
+        <div
+          onPointerDown={startResize}
+          className={`absolute bottom-2 right-2 w-4 h-4 rounded-full bg-proof hover:scale-125 hover:bg-proof-light cursor-se-resize flex items-center justify-center shadow-lg transition-all z-10 border border-white ${
+            selected || resizing ? "opacity-100" : "opacity-0 group-hover:opacity-75"
+          }`}
+          style={{
+            position: "absolute",
+            bottom: "8px",
+            right: "8px",
+            width: "16px",
+            height: "16px",
+            borderRadius: "50%",
+            backgroundColor: "var(--color-proof)",
+            cursor: "se-resize",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+            zIndex: 10,
+            border: "1px solid white",
+            transition: "opacity 0.2s, transform 0.2s",
+          }}
+        >
+          <svg width="6" height="6" viewBox="0 0 6 6" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 0L0 6M6 3L3 6" stroke="white" strokeWidth="1" strokeLinecap="round"/>
+          </svg>
+        </div>
+      </div>
+    </NodeViewWrapper>
+  );
+}
+
 const CustomImage = Image.extend({
   addAttributes() {
     return {
@@ -78,6 +165,9 @@ const CustomImage = Image.extend({
         },
       },
     };
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(ResizableImageNodeView);
   },
 });
 
@@ -156,7 +246,55 @@ export function WriteWorkspace({ documentId }: { documentId: string }) {
       TableCell,
       CustomImage.configure({ inline: false, allowBase64: true }),
     ],
-    editorProps: { attributes: { class: "tiptap" } },
+    editorProps: {
+      attributes: { class: "tiptap" },
+      handleDrop: (view, event, slice, moved) => {
+        if (!moved && event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0]) {
+          const file = event.dataTransfer.files[0];
+          if (file.type.startsWith("image/")) {
+            event.preventDefault();
+            const reader = new FileReader();
+            reader.onload = (e) => {
+              const src = e.target?.result;
+              if (typeof src === "string") {
+                const node = view.state.schema.nodes.image.create({ src, width: "100%" });
+                const transaction = view.state.tr.replaceSelectionWith(node);
+                view.dispatch(transaction);
+              }
+            };
+            reader.readAsDataURL(file);
+            return true;
+          }
+        }
+        return false;
+      },
+      handlePaste: (view, event) => {
+        const items = event.clipboardData?.items;
+        if (items) {
+          for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.type.startsWith("image/")) {
+              event.preventDefault();
+              const file = item.getAsFile();
+              if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                  const src = e.target?.result;
+                  if (typeof src === "string") {
+                    const node = view.state.schema.nodes.image.create({ src, width: "100%" });
+                    const transaction = view.state.tr.replaceSelectionWith(node);
+                    view.dispatch(transaction);
+                  }
+                };
+                reader.readAsDataURL(file);
+                return true;
+              }
+            }
+          }
+        }
+        return false;
+      },
+    },
     onUpdate: () => {
       setDocVersion((v) => v + 1);
       setSaveState("dirty");
